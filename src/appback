@@ -1,0 +1,383 @@
+import React from 'react';
+import './App.css';
+import { Map, Marker, NavigationControl, InfoWindow, Circle, MarkerList, PointLabel, } from 'react-bmap'
+import { Card, message } from 'antd';
+import { metaProperty } from '@babel/types';
+
+
+
+
+// 6371.004*ACOS(SIN(@GPSLat/180*PI())*SIN(@Lat/180*PI())+COS(@GPSLat/180*PI())*COS(@Lat/180*PI())*COS((@GPSLng-@Lng)/180*PI()))
+
+//121.511999,31.239185 上海中心
+// 万得 121.518381,31.214246
+// function getDis(slon,slat,tlon,tlat) {
+//   let res = 6371.004 * Math.acos(Math.sin(slat/180 * Math.PI) * Math.sin(tlat/180 * Math.PI) + Math.cos(slat/180*Math.PI) * Math.cos(tlat/180*Math.PI)*Math.cos((slon - tlon)/180*Math.PI))
+//   return res;
+// }
+
+function ZoomControl() {
+  // 默认停靠位置和偏移量
+  this.defaultAnchor = window.BMAP_ANCHOR_TOP_LEFT;
+  this.defaultOffset = new window.BMap.Size(80, 20);
+}
+
+
+
+function G(id) {
+  return document.getElementById(id);
+}
+
+var ply;
+var redcircle;
+
+
+class App extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      distance: 0
+    }
+  }
+
+  componentDidMount = () => {
+    const { BMap } = window;
+    this.map = new BMap.Map("baiduMap", { enableMapClick: false });
+
+    // this.map.centerAndZoom(new BMap.Point(121.518381, 31.214246), 15);
+    this.map.centerAndZoom("上海", 12);
+    this.map.disableDoubleClickZoom();
+    this.map.disableDragging();
+    this.map.enableScrollWheelZoom(true);
+    this.addMapControl();
+
+  }
+
+  ZoomControl = () => {
+    const { BMap } = window;
+    this.defaultAnchor = window.BMAP_ANCHOR_TOP_LEFT;
+    this.defaultOffset = new BMap.Size(10, 10)
+  }
+
+  getBoundary = (disname,point) => {
+    const { BMap } = window;
+    let map = this.map;
+    var bdary = new BMap.Boundary();
+    bdary.get(disname, function (rs) {       //获取行政区域
+      //map.clearOverlays();        //清除地图覆盖物
+      map.removeOverlay(ply);
+      map.removeOverlay(redcircle);
+      var count = rs.boundaries.length; //行政区域的点有多少个
+      if (count === 0) {
+        alert('未能获取当前输入行政区域');
+        return;
+      }
+      var pointArray = [];
+      ply = new BMap.Polygon(rs.boundaries[0], { strokeWeight: 2, strokeColor: "#ff0000" }); //建立多边形覆盖物
+      map.addOverlay(ply);  //添加覆盖物
+
+      redcircle = new BMap.Circle(point, 2000, { fillColor: "red", strokeWeight: 1 });
+      redcircle.addEventListener("click", e => {
+          // var point = e.currentTarget.point;
+          alert("here am i");
+      });
+      map.addControl(redcircle);  
+
+      //pointArray = pointArray.concat(ply.getPath());
+      // for (var i = 0; i < 1; i++) {
+      //   ply = new BMap.Polygon(rs.boundaries[i], { strokeWeight: 2, strokeColor: "#ff0000" }); //建立多边形覆盖物
+      //   map.addOverlay(ply);  //添加覆盖物
+      //   pointArray = pointArray.concat(ply.getPath());
+      // }
+      //map.setViewport(pointArray);    //调整视野
+          
+    });
+  }
+
+  DrawDistCircle = () => {
+    this.addDistCircle("上海市杨浦区", "杨浦", 100);
+    this.addDistCircle("上海市虹口区", "虹口", 200);
+    this.addDistCircle("上海市闸北区", "闸北", 300);
+    this.addDistCircle("上海市浦东新区", "浦东", 500);
+    this.addDistCircle("上海市徐汇区", "徐汇", 800);
+    this.addDistCircle("上海市静安区", "静安", 300);
+    this.addDistCircle("上海市长宁区", "长宁", 100);
+    this.addDistCircle("上海市普陀区", "普陀", 500);
+    this.addDistCircle("上海市闵行区沪闵路6258号", "闵行", 400);
+    this.addDistCircle("上海市金山区金山大道2000号", "金山", 700);
+    this.addDistCircle("上海市嘉定区博乐南路111号", "嘉定", 80);
+    this.addDistCircle("上海市松江区园中路1号", "松江", 88);
+    this.addDistCircle("上海市青浦区公园路100号", "青浦", 700);
+    this.addDistCircle("上海市奉贤区南桥镇解放东路928号", "奉贤", 80);
+  }
+
+  setLabels = (point, offsetx, offsety, content) => {
+    const { BMap } = window;
+    let map = this.map;
+    var opts = {
+      position: point,    // 指定文本标注所在的地理位置
+      offset: new BMap.Size(offsetx, offsety)    //设置文本偏移量
+    }
+    var label = new BMap.Label(content, opts);  // 创建文本标注对象
+    label.setStyle({
+      color: "white",
+      backgroundColor: "transparent",
+      border: "0px",
+      fontSize: "13px",
+      height: "20px",
+      lineHeight: "20px",
+    });
+    map.addOverlay(label);
+  }
+
+
+  drawtPolygon = (point) =>{    
+    const { BMap } = window;
+    let map = this.map;
+    var myGeo = new BMap.Geocoder();
+    let disname = "";
+    var that = this;
+    // 根据坐标得到地址描述    
+    myGeo.getLocation(new BMap.Point(point.lng, point.lat), function (result) {
+      if (result) {
+        let address = result.address;
+        if(address.indexOf("杨浦") !== -1) {
+          disname =  "上海市杨浦区";
+        } else if(address.indexOf("虹口") !== -1) {
+          disname =   "上海市虹口区";
+        } else if(address.indexOf("闸北") !== -1) {
+          disname =   "上海市闸北区";
+        } else if(address.indexOf("浦东") !== -1) {
+          disname =   "上海市浦东新区";
+        } else if(address.indexOf("徐汇") !== -1) {
+          disname =   "上海市徐汇区";
+        } else if(address.indexOf("静安") !== -1) {
+          disname =   "上海市静安区";
+        } else if(address.indexOf("长宁") !== -1) {
+          disname =   "上海市长宁区";
+        } else if(address.indexOf("虹口") !== -1) {
+          disname =   "上海市虹口区";
+        } else if(address.indexOf("普陀") !== -1) {
+          disname =   "上海市普陀区";
+        } else if(address.indexOf("闵行") !== -1) {
+          disname =   "上海市闵行区";
+        } else if(address.indexOf("崇明") !== -1) {
+          disname =   "上海市崇明区";
+        } else if(address.indexOf("嘉定") !== -1) {
+          disname =   "上海市嘉定区";
+        } else if(address.indexOf("松江") !== -1) {
+          disname =   "上海市松江区";
+        } else if(address.indexOf("青浦") !== -1) {
+          disname =   "上海市青浦区";
+        } else if(address.indexOf("奉贤") !== -1) {
+          disname =   "上海市奉贤区";
+        } 
+        //alert(disname);
+        that.getBoundary(disname,point);
+      }
+    });
+  }
+
+  addDistCircle = (dname, showname, num) => {
+    const { BMap } = window;
+    let map = this.map;
+    var myGeo = new BMap.Geocoder();
+    myGeo.getPoint(dname, point => {
+      if (point) {
+        var circle = new BMap.Circle(point, 2000, { fillColor: "green", strokeWeight: 1 })
+
+
+        circle.addEventListener("onmouseover",e=>{
+          map.removeOverlay(redcircle);
+          // var point = e.currentTarget.point;
+          this.drawtPolygon(point);
+          redcircle = new BMap.Circle(point, 2000, { fillColor: "red", strokeWeight: 1 });
+          map.addControl(redcircle);
+          
+          this.openInfoWin(point,showname);
+        });
+
+        circle.addEventListener("onmouseout",e=>{
+          map.removeOverlay(redcircle);
+          map.removeOverlay(ply);  
+        });
+
+
+        map.addOverlay(circle);
+        this.setLabels(point, -15, -20, showname);
+        this.setLabels(point, -15, 0, num + "家");
+      }
+    });
+  }
+
+
+  openInfoWin=(point,showname)=>{
+    const { BMap } = window;
+    let map = this.map;
+    let infoopts = {
+      width: 210, // 信息窗口宽度
+      height: 200, // 信息窗口高度
+      title: '<h4>'+showname+'</h4>', // 信息窗口标题
+      enableMessage: false, //设置允许信息窗发送短息
+    }
+    let companyContent = "注册资本第一公司: 65656565 <br/>注册资本第二公司: 65656565 <br/>注册资本第三公司: 65656565 <br/>注册资本第四公司: 65656565 <br/>注册资本第五公司: 65656565 <br/>更多>> "
+    let infowin = new BMap.InfoWindow(companyContent, infoopts);
+    map.openInfoWindow(infowin,point);
+  }
+
+  addMapControl = () => {
+    const { BMap } = window;
+    let map = this.map;
+    var top_right_conntrol = new window.BMap.ScaleControl({ anchor: window.BMAP_ANCHOR_TOP_RIGHT });
+    var top_right_navigation = new window.BMap.NavigationControl({ anchor: window.BMAP_ANCHOR_TOP_RIGHT });
+    map.addControl(top_right_conntrol);
+    map.addControl(top_right_navigation);
+    // let pointA = new BMap.Point(121.518381,31.214246);
+    // let pointB = new BMap.Point(121.511999,31.239185);
+    // this.setState({distance: (map.getDistance(pointA,pointB).toFixed(2))});
+    // let polyline = new BMap.Polyline([pointA,pointB],{
+    //   strokeColor: "blue", strokeWeight: 6, strokeOpacity: 0.5
+    // });
+    // map.addOverlay(polyline);
+    // var overView = new BMap.OverviewMapControl();
+    // var overViewOpen = new BMap.OverviewMapControl({ isOpen: true, anchor: window.BMAP_ANCHOR_BOTTOM_RIGHT });
+    // map.addControl(overView);
+    // map.addControl(overViewOpen);
+
+    // var geolocationControl = new BMap.GeolocationControl();
+    // geolocationControl.addEventListener("locationSuccess", e => {
+    //   var address = '';
+    //   address += e.addressComponent.province;
+    //   address += e.addressComponent.city;
+    //   address += e.addressComponent.district;
+    //   address += e.addressComponent.street;
+    //   address += e.addressComponent.streetNumber;
+    //   message.success(`当前定位地址为: ${address}`);
+    // });
+    // map.addControl(geolocationControl);
+    //this.getBoundary();
+    this.DrawDistCircle();
+
+    // var myGeo = new BMap.Geocoder();
+    // myGeo.getPoint("上海市金山区金山大道2000号",point=>{
+    //   if(point) {
+    //     map.addOverlay(new BMap.Circle(point,1000,{fillColor:"green", strokeWeight: 1}));
+    //   }
+    // });
+
+    // 通过JavaScript的prototype属性继承于BMap.Control
+    //ZoomControl.prototype = new BMap.Control();
+
+    // 自定义控件必须实现自己的initialize方法,并且将控件的DOM元素返回
+    // 在本方法中创建个div元素作为控件的容器,并将其添加到地图容器中
+    // ZoomControl.prototype.initialize = function (map) {
+    //   // 创建一个DOM元素
+    //   var div = document.createElement("div");
+    //   // 添加文字说明
+    //   div.appendChild(document.createTextNode("放大2级"));
+    //   // 设置样式
+    //   div.style.cursor = "pointer";
+    //   div.style.border = "1px solid gray";
+    //   div.style.backgroundColor = "white";
+    //   // 绑定事件,点击一次放大两级
+    //   div.onclick = function (e) {
+    //     map.setZoom(map.getZoom() + 2);
+    //   }
+    //   // 添加DOM元素到地图中
+    //   map.getContainer().appendChild(div);
+    //   // 将DOM元素返回
+    //   return div;
+    // }
+    // // 创建控件
+    // var myZoomCtrl = new ZoomControl();
+    // // 添加到地图当中
+    // map.addControl(myZoomCtrl);
+
+    // map.addControl(new BMap.CityListControl({
+    //   anchor: window.BMAP_ANCHOR_TOP_LEFT,
+    //   offset: new BMap.Size(10, 20)
+    // }));
+
+    // let local = new BMap.LocalSearch(map,{
+    //   renderOptions: {map : map}
+    // });
+    // local.search("景点");
+    // let myKeys = ["酒店","加油站"];
+    // let local = new BMap.LocalSearch(map, {
+    //   renderOptions: {map : map, panel: 'r-result'},
+    //   pageCapacity: 5
+    // });
+    // local.searchInBounds(myKeys,map.getBounds());
+
+    // var mPoint = new BMap.Point(121.518381,31.214246);
+    // let circle = new BMap.Circle(mPoint,1000,{
+    //   fillColor: "blue", strokeWeight: 1, fillOpacity: 0.3, strokeOpacity:0.3
+    // });
+    // map.addOverlay(circle);
+    // var local = new BMap.LocalSearch(map,{
+    //   renderOptions: {
+    //     map: map,
+    //     autoViewport: false
+    //   }
+    // });
+    // local.searchNearby("餐馆",mPoint,1000);
+    // var ac = new BMap.Autocomplete(    //建立一个自动完成的对象
+    //   {"input" : "suggestId"
+    //   ,"location" : ""
+    // });
+    //   ac.addEventListener("onhighlight",e=>{
+    //     var str = "";
+    //     var _value = e.fromitem.value;
+    //     var value = "";
+    //     if (e.fromitem.index > -1) {
+    //       value = _value.province +  _value.city +  _value.district +  _value.street +  _value.business;
+    //     }    
+    //     str = "FromItem<br />index = " + e.fromitem.index + "<br />value = " + value;
+
+    //     value = "";
+    //     if (e.toitem.index > -1) {
+    //       _value = e.toitem.value;
+    //       value = _value.province +  _value.city +  _value.district +  _value.street +  _value.business;
+    //     }    
+    //     str += "<br />ToItem<br />index = " + e.toitem.index + "<br />value = " + value;
+    //     G("searchResultPanel").innerHTML = str;
+    //   });
+
+    //   var myValue;
+    //   ac.addEventListener("onconfirm", function(e) {    //鼠标点击下拉列表后的事件
+    //   var _value = e.item.value;
+    //     myValue = _value.province +  _value.city +  _value.district +  _value.street +  _value.business;
+    //     G("searchResultPanel").innerHTML ="onconfirm<br />index = " + e.item.index + "<br />myValue = " + myValue;
+
+    //     this.setPlace();
+    //   });
+
+    // }
+
+    // setPlace = ()=> {
+    //   const { BMap } = window;
+    //   let map = this.map;
+    //   map.clearOverlays();
+    //   function myFun() {
+    //     var pp = local.getResults().getPoi(0).point;    //获取第一个智能搜索的结果
+    //     map.centerAndZoom(pp, 18);
+    //     map.addOverlay(new BMap.Marker(pp));    //添加标注
+    //   }
+    //   var local = new BMap.LocalSearch(map, { //智能搜索
+    //     onSearchComplete: myFun
+    //   });
+    //local.search(myValue);
+  };
+
+  render() {
+    return (
+      <div>
+        <Card title="地图" extra={this.state.distance} >
+          <div id="baiduMap" style={{ height: 800 }}></div>
+        </Card>
+      </div>
+    )
+  }
+}
+
+export default App;

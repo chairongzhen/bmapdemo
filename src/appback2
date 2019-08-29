@@ -4,8 +4,21 @@ import { Card } from 'antd';
 import block from './block.json';
 import demoData from './demoCorp.json';
 
+
+
+
+// 6371.004*ACOS(SIN(@GPSLat/180*PI())*SIN(@Lat/180*PI())+COS(@GPSLat/180*PI())*COS(@Lat/180*PI())*COS((@GPSLng-@Lng)/180*PI()))
+
+//121.511999,31.239185 上海中心
+// 万得 121.518381,31.214246
+// function getDis(slon,slat,tlon,tlat) {
+//   let res = 6371.004 * Math.acos(Math.sin(slat/180 * Math.PI) * Math.sin(tlat/180 * Math.PI) + Math.cos(slat/180*Math.PI) * Math.cos(tlat/180*Math.PI)*Math.cos((slon - tlon)/180*Math.PI))
+//   return res;
+// }
+
 var ply;
 var redcircle;
+
 
 class App extends React.Component {
   constructor(props) {
@@ -14,7 +27,7 @@ class App extends React.Component {
       zoomSize: 0,
       point: null,
       city: "上海市",
-      district: "浦东",
+      district: "上海市浦东新区",
       block: "陆家嘴"
     }
   }
@@ -31,25 +44,15 @@ class App extends React.Component {
       city: currentCity
     });
     this.map.disableDoubleClickZoom();
+    //this.map.disableDragging();
     this.map.enableScrollWheelZoom(true);
     this.map.enableContinuousZoom(true);
     this.addMapControl();
     this.map.addEventListener("zoomend",this.zoomChanged);
+    
+    //console.log("here it is : ",block);
+
   }
-
-
-
-  
-  render() {
-    return (
-      <div>
-        <Card title="地图" extra={this.state.zoomSize} >
-          <div id="baiduMap" style={{ height: 800 }}></div>
-        </Card>
-      </div>
-    )
-  }
-
 
   zoomChanged = () => {
     let map = this.map;
@@ -72,10 +75,53 @@ class App extends React.Component {
     } 
   }
 
+
+
+  getBoundary = (disname,point) => {
+    const { BMap } = window;
+    let map = this.map;
+    var bdary = new BMap.Boundary();
+    var that = this;
+    bdary.get(disname, function (rs) {       //获取行政区域
+      //map.clearOverlays();        //清除地图覆盖物
+      map.removeOverlay(ply);
+      map.removeOverlay(redcircle);
+      var count = rs.boundaries.length; //行政区域的点有多少个
+      if (count === 0) {
+        alert('未能获取当前输入行政区域');
+        return;
+      }
+      
+      ply = new BMap.Polygon(rs.boundaries[0], { strokeWeight: 2, strokeColor: "#ff0000" }); //建立多边形覆盖物
+      map.addOverlay(ply);  //添加覆盖物
+
+      redcircle = new BMap.Circle(point, 2000, { fillColor: "red", strokeWeight: 1 });
+      redcircle.addEventListener("click", e => {
+          that.detailMap(point,disname);
+      });
+      map.addControl(redcircle);           
+    });
+  }
+
   drawDistCircle = (city) => {
+    // this.addDistCircle("上海市杨浦区", "杨浦", 100);
+    // this.addDistCircle("上海市虹口区", "虹口", 200);
+    // this.addDistCircle("上海市闸北区", "闸北", 300);
+    // this.addDistCircle("上海市浦东新区", "浦东", 500);
+    // this.addDistCircle("上海市徐汇区", "徐汇", 800);
+    // this.addDistCircle("上海市静安区", "静安", 300);
+    // this.addDistCircle("上海市长宁区", "长宁", 100);
+    // this.addDistCircle("上海市普陀区", "普陀", 500);
+    // this.addDistCircle("上海市闵行区沪闵路6258号", "闵行", 400);
+    // this.addDistCircle("上海市金山区金山大道2000号", "金山", 700);
+    // this.addDistCircle("上海市嘉定区博乐南路111号", "嘉定", 80);
+    // this.addDistCircle("上海市松江区园中路1号", "松江", 88);
+    // this.addDistCircle("上海市青浦区公园路100号", "青浦", 700);
+    // this.addDistCircle("上海市奉贤区南桥镇解放东路928号", "奉贤", 80);
     for(let c of block) {
       if(c.city === city) {
         for(let dis of c.distict) {
+          //addDistrictCircle = (lng,lat,boundary,showname,num)
           this.addDistrictCircle(dis.location.lng,dis.location.lat,dis.boundary,dis.name,Math.ceil(Math.random()*1000));
         }
       }
@@ -106,9 +152,10 @@ class App extends React.Component {
       point: point,
       district: showname
     });
-    
     map.clearOverlays();
-    this.drawBlockCircle(showname);
+    if(showname.indexOf(showname) != -1) {
+      this.drawBlockCircle(showname);
+    }
 
   }
 
@@ -170,6 +217,50 @@ class App extends React.Component {
     map.addOverlay(ply);
   }
 
+  drawtPolygon = (point) =>{    
+    const { BMap } = window;
+    var myGeo = new BMap.Geocoder();
+    let disname = "";
+    var that = this;
+    // 根据坐标得到地址描述    
+    myGeo.getLocation(new BMap.Point(point.lng, point.lat), function (result) {
+      if (result) {
+        let address = result.address;
+        if(address.indexOf("杨浦") !== -1) {
+          disname =  "上海市杨浦区";
+        } else if(address.indexOf("虹口") !== -1) {
+          disname =   "上海市虹口区";
+        } else if(address.indexOf("闸北") !== -1) {
+          disname =   "上海市闸北区";
+        } else if(address.indexOf("浦东") !== -1) {
+          disname =   "上海市浦东新区";
+        } else if(address.indexOf("徐汇") !== -1) {
+          disname =   "上海市徐汇区";
+        } else if(address.indexOf("静安") !== -1) {
+          disname =   "上海市静安区";
+        } else if(address.indexOf("长宁") !== -1) {
+          disname =   "上海市长宁区";
+        } else if(address.indexOf("虹口") !== -1) {
+          disname =   "上海市虹口区";
+        } else if(address.indexOf("普陀") !== -1) {
+          disname =   "上海市普陀区";
+        } else if(address.indexOf("闵行") !== -1) {
+          disname =   "上海市闵行区";
+        } else if(address.indexOf("崇明") !== -1) {
+          disname =   "上海市崇明区";
+        } else if(address.indexOf("嘉定") !== -1) {
+          disname =   "上海市嘉定区";
+        } else if(address.indexOf("松江") !== -1) {
+          disname =   "上海市松江区";
+        } else if(address.indexOf("青浦") !== -1) {
+          disname =   "上海市青浦区";
+        } else if(address.indexOf("奉贤") !== -1) {
+          disname =   "上海市奉贤区";
+        } 
+        that.getBoundary(disname,point);
+      }
+    });
+  }
 
   addBlockCircle = (lng,lat,boundary,showname,num) => {
     const { BMap } = window;
@@ -182,10 +273,6 @@ class App extends React.Component {
       this.drawBlockPolygon(boundary);
       redcircle = new BMap.Circle(point, 300, { fillColor: "red", strokeWeight: 1 });
       redcircle.addEventListener("click", e => {
-        this.setState({
-          point: point,
-          block: showname
-        });
         that.detailCorps(lng,lat,showname); 
       });
       map.addControl(redcircle);      
@@ -229,6 +316,33 @@ class App extends React.Component {
     map.addOverlay(circle);
   }
 
+  addDistCircle = (dname, showname, num) => {
+    const { BMap } = window;
+    let map = this.map;
+    let myGeo = new BMap.Geocoder();
+    myGeo.getPoint(dname, point => {
+      if (point) {
+        let circle = new BMap.Circle(point, 2000, { fillColor: "green", strokeWeight: 1 });
+        circle.addEventListener("onmouseover",e=>{
+          map.removeOverlay(redcircle);
+          this.drawtPolygon(point);
+          redcircle = new BMap.Circle(point, 2000, { fillColor: "red", strokeWeight: 1 });
+          map.addControl(redcircle);        
+          this.openInfoWin(point,showname);
+        });
+
+        circle.addEventListener("onmouseout",e=>{
+          map.removeOverlay(redcircle);
+          map.removeOverlay(ply);  
+        });
+
+        this.setLabels(point, -15, -20, showname);
+        this.setLabels(point, -15, 0, num + "家");
+        map.addOverlay(circle);
+      }
+    });
+  }
+
 
   openInfoWin=(point,showname)=>{
     const { BMap } = window;
@@ -252,6 +366,17 @@ class App extends React.Component {
     map.addControl(top_right_navigation);
     this.drawDistCircle("上海市");
   };
+
+  
+  render() {
+    return (
+      <div>
+        <Card title="地图" extra={this.state.zoomSize} >
+          <div id="baiduMap" style={{ height: 800 }}></div>
+        </Card>
+      </div>
+    )
+  }
 }
 
 export default App;
